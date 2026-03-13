@@ -14,6 +14,11 @@ cambios = []
 direcciones = []
 primer_cambio = True
 ancho, alto = 120, 100
+
+usar_suavizado = True
+usar_contraste = False  # filtro adicional 1
+usar_laplaciano = True  # filtro adicional 2
+
 imagen_original = "" #Crea una nueva imagen en blanco con el tamaño especificado
 imagen_gaussiano = Image.new("RGB", (ancho, alto), color="white") #Crea una nueva imagen en blanco con el tamaño especificado
 imagen_gradiente = Image.new("RGB", (ancho, alto), color="white") #Crea una nueva imagen en blanco con el tamaño especificado
@@ -24,15 +29,21 @@ imagen_procesada = Image.new("RGB", (ancho, alto), color="white") #Crea una nuev
 
 def cargar_imagen(event):
     global imagen, pixeles, ancho, alto, imagen_original, imagen_escala_grises
+    global imagen_gaussiano, imagen_gradiente, imagen_supresion, imagen_procesada
     Tk().withdraw()
     archivo = askopenfilename(title="Seleccionar imagen", filetypes=[("Archivos de imagen", "*.jpg;*.jpeg;*.png;*.bmp")])
     if not archivo: exit()
 
     imagen = Image.open(archivo)
     ancho, alto = imagen.size
-    imagen_escala_grises = Image.new("RGB", (ancho, alto), color="white") #Crea una nueva imagen en blanco con el tamaño especificado
-    pixeles = imagen.load()
 
+    imagen_escala_grises = Image.new("RGB", (ancho, alto), color="white")
+    imagen_gaussiano = Image.new("RGB", (ancho, alto), color="white")
+    imagen_gradiente = Image.new("RGB", (ancho, alto), color="white")
+    imagen_supresion = Image.new("RGB", (ancho, alto), color="white")
+    imagen_procesada = Image.new("RGB", (ancho, alto), color="white")
+
+    pixeles = imagen.load()
     aplicar_escalagrises()
 
 def actualizar_visualizacion(titulo):
@@ -47,8 +58,12 @@ def actualizar_visualizacion(titulo):
     ax2.set_title("2. Escala de Grises")
 
     ax3.clear()
-    ax3.imshow(imagen_gaussiano)
-    ax3.set_title("3. Suavizado Gaussiano")
+    if usar_suavizado:
+        ax3.imshow(imagen_gaussiano)
+        ax3.set_title("3. Suavizado Gaussiano")
+    else:
+        ax3.set_title("3. Suavizado Gaussiano (desactivado)")
+        ax3.axis("off")
 
     ax4.clear()
     ax4.imshow(imagen_gradiente)
@@ -60,7 +75,16 @@ def actualizar_visualizacion(titulo):
 
     ax6.clear()
     ax6.imshow(imagen_procesada)
-    ax6.set_title("6. Resultado Final (Histeresis)")
+
+    if usar_contraste:
+        ax6.set_title("6. Resultado Final Canny (Contraste Aumentado)")
+    else:
+        ax6.set_title("6. Resultado Final Canny")
+
+    if usar_laplaciano:
+        ax6.set_title("6. Resultado Final Canny + Laplaciano")
+    else:        
+        ax6.set_title("6. Resultado Final Canny")
 
     fig.canvas.draw_idle()
 
@@ -80,7 +104,15 @@ def aplicar_escalagrises():
 
                 pixeles_salida[x, y] = (g, g, g) #Asigna el valor de gris a los tres canales RGB
     actualizar_visualizacion("Escala de Grises") #Actualiza la vista de matplotlib
-    aplicar_suavizadoGaussiano()
+    actualizar_visualizacion("Escala de Grises")
+
+    if usar_contraste:
+        aumentar_contraste()
+
+    if usar_suavizado:
+        aplicar_suavizadoGaussiano()
+    else:
+        obtener_gradiente()
 
 def aplicar_mascara(nombreMask, mask, imagen_destino):
     global imagen_escala_grises
@@ -120,19 +152,22 @@ def aplicar_suavizadoGaussiano():
 
 def obtener_gradiente():
     global imagen_gradiente, imagen_gaussiano, direcciones
-    imagen_gradiente = Image.new("RGB", (ancho, alto), color="white") #Crea una nueva imagen en blanco con el tamaño especificado
+
+    if not usar_suavizado:
+        imagen_gaussiano = imagen_escala_grises.copy()
+
+    imagen_gradiente = Image.new("RGB", (ancho, alto), color="white")
 
     pixeles_entrada = imagen_gaussiano.load()
-    pixeles_salida = imagen_gradiente.load() #Crea un objeto PixelAccess para la imagen de gris
+    pixeles_salida = imagen_gradiente.load()
 
-    direcciones = [[0]*alto for _ in range(ancho)] #Obtiene la direcciones de los gradientes para cada pixel
+    direcciones = [[0]*alto for _ in range(ancho)]
 
     mask_x = [
         [-1,0,1],
         [-2,0,2],
         [-1,0,1]
     ]
-
     mask_y = [
         [1,2,1],
         [0,0,0],
@@ -140,31 +175,28 @@ def obtener_gradiente():
     ]
 
     for x in range(ancho):
-         for y in range(alto):
-                gx = gy = 0
-                radio = len(mask_x) // 2
-                for dx in range(-radio, radio+1):
-                    for dy in range(-radio, radio+1):
-                        if 0 <= x+dx < ancho and 0 <= y+dy < alto:
-                            pixel = pixeles_entrada[x+dx, y+dy][0]
+        for y in range(alto):
+            gx = gy = 0
+            radio = len(mask_x) // 2
+            for dx in range(-radio, radio+1):
+                for dy in range(-radio, radio+1):
+                    if 0 <= x+dx < ancho and 0 <= y+dy < alto:
+                        pixel = pixeles_entrada[x+dx, y+dy][0]
+                        peso_x = mask_x[dy+radio][dx+radio]
+                        peso_y = mask_y[dy+radio][dx+radio]
+                        gx += pixel * peso_x
+                        gy += pixel * peso_y
 
-                            peso_x = mask_x[dy+radio][dx+radio]
-                            peso_y = mask_y[dy+radio][dx+radio]
+            magnitud = int(max(0, min(255, int((gx**2 + gy**2)**0.5))))
 
-                            gx += pixel * peso_x
-                            gy += pixel * peso_y
-                magnitud = int((gx**2 + gy**2)**0.5)
+            direccion = math.degrees(math.atan2(gy, gx))
+            if direccion < 0:
+                direccion += 180
+            direcciones[x][y] = direccion
 
-                direccion = math.degrees(math.atan2(gy, gx))
-                if direccion < 0:
-                    direccion += 180
-                
-                direcciones[x][y] = direccion
+            pixeles_salida[x, y] = (magnitud, magnitud, magnitud)
 
-                # direccion = int((180 / 3.14159) * atan2(gy, gx)) % 180
-                magnitud = int(max(0, min(255, magnitud)))
-                pixeles_salida[x, y] = (magnitud, magnitud, magnitud)
-    actualizar_visualizacion("Gradiente") #Actualiza la vista de matplotlib
+    actualizar_visualizacion("Gradiente")
     aplicar_supresionMax()
 
 def aplicar_supresionMax():
@@ -261,6 +293,44 @@ def aplicar_histeresis():
             else:
                 pixeles_salida[x,y] = (0,0,0)
     actualizar_visualizacion("Histeresis") #Actualiza la vista de matplotlib
+    if usar_laplaciano:
+        aplicar_laplaciano()
+
+def aumentar_contraste():
+    global imagen_escala_grises
+    pix = imagen_escala_grises.load()
+
+    for x in range(ancho):
+        for y in range(alto):
+            g = pix[x,y][0]
+            g = min(255, int(g * 1.3))
+            pix[x,y] = (g,g,g)
+
+def aplicar_laplaciano():
+    global imagen_procesada
+
+    mask = [
+        [0,1,0],
+        [1,-4,1],
+        [0,1,0]
+    ]
+
+    imagen_temp = Image.new("RGB",(ancho,alto))
+    pix_in = imagen_procesada.load()
+    pix_out = imagen_temp.load()
+
+    for x in range(1,ancho-1):
+        for y in range(1,alto-1):
+            suma = 0
+            for dx in range(-1,2):
+                for dy in range(-1,2):
+                    peso = mask[dx+1][dy+1]
+                    val = pix_in[x+dx,y+dy][0]
+                    suma += peso * val
+            suma = max(0,min(255,abs(suma)))
+            pix_out[x,y] = (suma,suma,suma)
+
+    imagen_procesada = imagen_temp
 
 fig, ((ax1, ax2, ax3),
       (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(10, 5))
