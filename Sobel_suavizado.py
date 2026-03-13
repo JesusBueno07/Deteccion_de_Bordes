@@ -140,6 +140,18 @@ def guardar_imagen(event):
     else:
         print("Guardado cancelado")
 
+def guardar_imagen1(event):
+    Tk().withdraw()
+    nombre_archivo = asksaveasfilename(
+        title="Guardar imagen procesada",
+        defaultextension=".png",
+        filetypes=[("PNG", "*.png"),("JPEG", "*.jpg"),("BMP", "*.bmp")]
+        )
+    if nombre_archivo:
+        filtro_sobel.save(nombre_archivo)
+    else:
+        print("Guardado cancelado")
+
 fig, (ax1, ax2, ax3, ax4, ax5, ax6) = plt.subplots(1, 6, figsize=(14, 8))
 
 ax1.imshow(imagen)
@@ -171,8 +183,13 @@ plt.tight_layout()
 plt.subplots_adjust(top=0.9)
 
 ax_btn_guardar = plt.axes([0.9, 0.96, 0.08, 0.04])
-btn_guardar = Button(ax_btn_guardar, 'Guardar',
+btn_guardar = Button(ax_btn_guardar, 'Guardar filtro Laplaciano',
                     color='lightcoral', hovercolor='salmon')
 btn_guardar.on_clicked(guardar_imagen)
+
+ax_btn_guardar1 = plt.axes([0.48, 0.96, 0.1, 0.04])
+btn_guardar1 = Button(ax_btn_guardar1, 'Guardar filtro Sobel',
+                    color='lightcoral', hovercolor='salmon')
+btn_guardar1.on_clicked(guardar_imagen1)
 
 plt.show()
