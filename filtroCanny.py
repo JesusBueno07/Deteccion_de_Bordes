@@ -17,7 +17,7 @@ ancho, alto = 120, 100
 
 usar_suavizado = True
 usar_contraste = False  # filtro adicional 1
-usar_laplaciano = True  # filtro adicional 2
+usar_laplaciano = False  # filtro adicional 2
 
 imagen_original = "" #Crea una nueva imagen en blanco con el tamaño especificado
 imagen_gaussiano = Image.new("RGB", (ancho, alto), color="white") #Crea una nueva imagen en blanco con el tamaño especificado
@@ -76,15 +76,15 @@ def actualizar_visualizacion(titulo):
     ax6.clear()
     ax6.imshow(imagen_procesada)
 
+    titulo = "6. Resultado Final Canny"
+
     if usar_contraste:
-        ax6.set_title("6. Resultado Final Canny (Contraste Aumentado)")
-    else:
-        ax6.set_title("6. Resultado Final Canny")
+        titulo += " + Contraste"
 
     if usar_laplaciano:
-        ax6.set_title("6. Resultado Final Canny + Laplaciano")
-    else:        
-        ax6.set_title("6. Resultado Final Canny")
+        titulo += " + Laplaciano"
+
+    ax6.set_title(titulo)
 
     fig.canvas.draw_idle()
 
@@ -305,6 +305,7 @@ def aumentar_contraste():
             g = pix[x,y][0]
             g = min(255, int(g * 1.3))
             pix[x,y] = (g,g,g)
+    actualizar_visualizacion("Contraste Aumentado")
 
 def aplicar_laplaciano():
     global imagen_procesada
